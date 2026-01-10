@@ -1,0 +1,1 @@
+raw_name.decode('utf-8').rstrip('\x00')
