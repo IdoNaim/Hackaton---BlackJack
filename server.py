@@ -23,6 +23,7 @@ def handle_request(client_socket):
     print("got message ")
     global is_playing
     data = client_socket.recv(38)
+    print("line 26")
     msg = struct.unpack('!IBB32s', data)
     if magic_cookie == msg[0] and request_msg_type == msg[1]:
         num_rounds = msg[2]
@@ -32,14 +33,18 @@ def handle_request(client_socket):
         handle_game(client_socket, num_rounds)
 
 def handle_game(client_socket, num_round):
-    p_card1, p_card2, d_card1, d_card2 = initial_deal(client_socket)
-    player_score = get_val_by_rank(p_card1) + get_val_by_rank(p_card2)
-    dealer_score = get_val_by_rank(d_card1) + get_val_by_rank(d_card2)
+    print(num_round)
     for i in range(1 ,num_round+1):
+        print(f"Starting round {i}")
+        p_card1, p_card2, d_card1, d_card2 = initial_deal(client_socket)
+        player_score = get_val_by_rank(p_card1) + get_val_by_rank(p_card2)
+        dealer_score = get_val_by_rank(d_card1) + get_val_by_rank(d_card2)
         round_status = 0x0
         did_stand = False
+        print(f"DEBUG: Starting player score: {player_score}, Starting dealer_score:{dealer_score}, dealer cards: {d_card1}, {d_card2}")
         #--------------player turn start-----------------------
-        while not did_stand and round_status == 0x0:                                    
+        while not did_stand and round_status == 0x0:                      
+            print("line 43")              
             cookie, type, decision_raw = struct.unpack('!IB5s',client_socket.recv(10))
             if cookie == magic_cookie and type == payload_msg_type:
                 player_decision = decision_raw.decode('utf-8').rstrip('\x00')
@@ -50,8 +55,11 @@ def handle_game(client_socket, num_round):
                     client_socket.sendall(make_payload(round_status, new_card))
                 elif player_decision == "Stand":
                     did_stand =  True
-                    round_status = check_status(player_score, dealer_score, did_stand)     
-
+                    round_status = check_status(player_score, dealer_score, did_stand)
+            print(f"DEBUG: player score: {player_score}, dealer score: {dealer_score}")
+     
+        second_d_card_msg = make_payload(0x0, d_card2)                                  # dealer turn start
+        client_socket.sendall(second_d_card_msg)                                        #reveal second card to player
         #--------------player turn ends-----------------------
 
         if round_status != 0x0:                                                         # check if player lost during his turn
@@ -59,8 +67,8 @@ def handle_game(client_socket, num_round):
             print(f"round ended with result {round_status}, moving on to next round")
             continue
         #--------------dealer turn starts----------------
-        second_d_card_msg = make_payload(0x0, d_card2)                                  # dealer turn start
-        client_socket.sendall(second_d_card_msg)                                        #reveal second card to player
+        # second_d_card_msg = make_payload(0x0, d_card2)                                  # dealer turn start
+        # client_socket.sendall(second_d_card_msg)                                        #reveal second card to player
         while dealer_score < 17:
             new_d_card = drawCard()
             client_socket.sendall(make_payload(0x0, new_d_card))
@@ -69,7 +77,9 @@ def handle_game(client_socket, num_round):
         #------------dealer turn ends------------------
         round_status = check_status(player_score, dealer_score, did_stand)
         client_socket.sendall(make_payload(round_status, (0, 0)))
-        print(f"Round {i+1} Result: {round_status}")
+        print(f"Round {i} Result: {round_status}")
+    print(f"finished game with player, closing connection")
+    client_socket.close()
 
             
             
