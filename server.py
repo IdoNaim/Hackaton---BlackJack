@@ -12,6 +12,21 @@ RANKS = {1: "Ace", 2: "2", 3: "3", 4: "4",5: "5",6: "6",7: "7",8: "8",9: "9",10:
 RANK_TO_VAL = {1: 11, 2: 2, 3: 3, 4: 4,5: 5,6: 6,7: 7,8: 8,9: 9,10: 10, 11: 10, 12: 10, 13: 10}
 
 #----------------helper functions----------
+def get_local_ip():
+    """
+    This function connects to a public DNS (Google) just to see 
+    which network interface the OS decides to use. 
+    It doesn't actually send data.
+    """
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+    
 def broadcast_offer():
     while True:
         if not is_playing:
@@ -155,7 +170,7 @@ server_name = "BlackJackinton"
 #-----------------other configurations-----------
 client_offer_msg_port = 13122
 server_udp_port = 0                     #starting value so that the OS gives us an unused port
-server_ip ='0.0.0.0'
+server_ip = get_local_ip()
 is_playing = False
 request_msg_type = 0x3
 #----------------------------------------------
@@ -163,16 +178,17 @@ request_msg_type = 0x3
 #-----------creating UDP server---------------
 udp_server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 udp_server.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)    # Enable sending broadcast packets
-udp_server.bind(("", server_udp_port))                       # Bind to address
+udp_server.bind((server_ip, server_udp_port))                       # Bind to address
 #----------------------------------------------------------------
 #----------- creating TCP server---------------
 tcp_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 tcp_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-tcp_server.bind(("", server_tcp_port))
+tcp_server.bind((server_ip, server_tcp_port))
 tcp_server.settimeout(1.0)
 tcp_server.listen()
-server_IP, server_tcp_port = tcp_server.getsockname()
-print(f"Server started, listening on IP address {server_IP}")
+_, server_tcp_port = tcp_server.getsockname()
+
+print(f"Server started, listening on IP address {server_ip}")
 #-----------------------------------------------
 #------------------creating encoded offer message-------------
 encoded_name = server_name.encode('utf-8')[:32].ljust(32, b'\x00')   # encode the server name and ensure it is 32 bytes long

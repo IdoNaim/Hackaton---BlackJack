@@ -1,10 +1,25 @@
-from scapy.all import *
 import socket
+import time
+import struct
 
 # Suit Mapping (for display purposes)
 SUITS = {0: "Spades", 1: "Hearts", 2: "Diamonds", 3: "Clubs"}
 RANKS = {1: "Ace", 2: "2", 3: "3", 4: "4",5: "5",6: "6",7: "7",8: "8",9: "9",10: "10", 11: "Jack", 12: "Queen", 13: "King"}
 #------helper function------
+def get_local_ip():
+    """
+    Finds the real local IP address (Wifi/Ethernet)
+    by connecting to a public DNS. It doesn't send data.
+    """
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
 def handle_offer(server_tcp_port, address):
     tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  #create a tcp socket
     tcp_client.connect((address[0], server_tcp_port))
@@ -121,9 +136,9 @@ offer_msg_port = 13122
 offer_msg_type = 0x2
 udp_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 # Bind to "0.0.0.0" (all interfaces) and the specific port
-udp_client.bind(("", offer_msg_port))
+ip = get_local_ip()
+udp_client.bind((ip, offer_msg_port))
 udp_client.settimeout(1.0)
-
 #----------------------------------------
 #----------forming request message----------
 encoded_name = team_name.encode('utf-8')[:32].ljust(32, b'\x00')   # encode the server name and ensure it is 32 bytes long
@@ -134,7 +149,7 @@ request_msg = struct.pack('!IBB32s', magic_cookie, request_msg_type, number_of_r
 
 
 while True:
-    print(f"Started Client, listening for offer requests on IP address {udp_client.getsockname()}")
+    print(f"Started Client, listening for offer requests on IP address {ip}")
     input_num_of_rounds()
     create_request_message()
     try:
