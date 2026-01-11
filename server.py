@@ -2,14 +2,21 @@ import socket
 import time
 import struct
 import threading
+import random
 
-#deck = []
+
+# Suit Mapping (for display purposes)
+SUITS = {0: "Spades", 1: "Hearts", 2: "Diamonds", 3: "Clubs"}
+RANKS = {1: "Ace", 2: "2", 3: "3", 4: "4",5: "5",6: "6",7: "7",8: "8",9: "9",10: "10", 11: "Jack", 12: "Queen", 13: "King"}
+#rank to value mapping
+RANK_TO_VAL = {1: 11, 2: 2, 3: 3, 4: 4,5: 5,6: 6,7: 7,8: 8,9: 9,10: 10, 11: 10, 12: 10, 13: 10}
+
 #----------------helper functions----------
 def broadcast_offer():
     while True:
         if not is_playing:
             udp_server.sendto(offer_message, ('255.255.255.255', client_offer_msg_port ))
-            print("Sent messsage")
+            #print("Sent messsage")
             time.sleep(2)
 
 def handle_request(client_socket):
@@ -22,10 +29,100 @@ def handle_request(client_socket):
         team_raw_name = msg[3]
         team_name = team_raw_name.decode('utf-8').rstrip('\x00')
         print(f"Team {team_name} vs {server_name}!'\n' Let The Game Begin!")
-        #handle_game(client_socket, num_rounds)
+        handle_game(client_socket, num_rounds)
 
 def handle_game(client_socket, num_round):
-    card1 = 1
+    p_card1, p_card2, d_card1, d_card2 = initial_deal(client_socket)
+    player_score = get_val_by_rank(p_card1) + get_val_by_rank(p_card2)
+    dealer_score = get_val_by_rank(d_card1) + get_val_by_rank(d_card2)
+    for i in range(1 ,num_round+1):
+        round_status = 0x0
+        did_stand = False
+        #--------------player turn start-----------------------
+        while not did_stand and round_status == 0x0:                                    
+            cookie, type, decision_raw = struct.unpack('!IB5s',client_socket.recv(10))
+            if cookie == magic_cookie and type == payload_msg_type:
+                player_decision = decision_raw.decode('utf-8').rstrip('\x00')
+                if player_decision == "Hittt" and not did_stand:
+                    new_card = drawCard()
+                    player_score = player_score + get_val_by_rank(new_card)
+                    round_status = check_status(player_score, dealer_score, did_stand)     
+                    client_socket.sendall(make_payload(round_status, new_card))
+                elif player_decision == "Stand":
+                    did_stand =  True
+                    round_status = check_status(player_score, dealer_score, did_stand)     
+
+        #--------------player turn ends-----------------------
+
+        if round_status != 0x0:                                                         # check if player lost during his turn
+            client_socket.sendall(make_payload(round_status, p_card1))                  #p_card1 here shouldnt be read by the client because round_status is not 0x0
+            print(f"round ended with result {round_status}, moving on to next round")
+            continue
+        #--------------dealer turn starts----------------
+        second_d_card_msg = make_payload(0x0, d_card2)                                  # dealer turn start
+        client_socket.sendall(second_d_card_msg)                                        #reveal second card to player
+        while dealer_score < 17:
+            new_d_card = drawCard()
+            client_socket.sendall(make_payload(0x0, new_d_card))
+            dealer_score = dealer_score + get_val_by_rank(new_d_card)
+            time.sleep(1)
+        #------------dealer turn ends------------------
+        round_status = check_status(player_score, dealer_score, did_stand)
+        client_socket.sendall(make_payload(round_status, (0, 0)))
+        print(f"Round {i+1} Result: {round_status}")
+
+            
+            
+
+#return 0x0 if round is not over, 0x1 if tie, 0x2 if player lost, 0x3 if player won
+def check_status(player_score, dealer_score, did_stand):
+    if player_score > 21:                       # if player busts, lose immediately
+            return 0x2
+    elif dealer_score > 21:                     # if dealer busts, win immediately
+            return 0x3
+    elif dealer_score >= 17 and did_stand:      # if no one busts, but both the player and dealer stopped taking cards
+        if player_score > dealer_score:
+            return 0x3
+        elif dealer_score > player_score:
+            return 0x2
+        else:
+            return 0x1
+    else:                                       # if no one busts, but either the player or the dealer keep taking cards
+        return 0x0          
+
+    
+
+#assuming card is tuple of <int, int>
+def get_val_by_rank(card) :
+    result = RANK_TO_VAL.get(card[0])
+    if isinstance(result, int) :
+        return result
+    else:
+        raise ValueError("tried to get rank of number not between 1 and 13")
+
+    #returns tuple of 4 cards: 2 of player and 2 of dealer
+def initial_deal(client_socket):
+    p_card1 = drawCard()
+    p_card2 = drawCard()
+    d_card1 = drawCard()
+    d_card2 = drawCard()
+    first_card_msg = make_payload(0x0, p_card1)
+    client_socket.sendall(first_card_msg)
+    second_card_msg = make_payload(0x0, p_card2)
+    client_socket.sendall(second_card_msg)
+    first_d_card_msg = make_payload(0x0, d_card1)
+    client_socket.sendall(first_d_card_msg)
+    return p_card1, p_card2, d_card1, d_card2
+
+def make_payload(round_result : int, card : tuple[int, int] ):
+    payload = struct.pack('!IBBHB', magic_cookie, payload_msg_type, round_result, card[0], card[1])
+    return payload
+
+#return tuple <rank,suit>
+def drawCard():
+    suit = random.randint(0, 3)
+    rank = random.randint(1, 13)
+    return rank, suit
 
 
 
@@ -34,7 +131,8 @@ def handle_game(client_socket, num_round):
 # magic_cookie
 payload_msg_type = 0x4
 # round result
-# card value
+# card rank
+#card suit
 #------------------------------------------------
 
 
