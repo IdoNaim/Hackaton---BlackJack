@@ -30,7 +30,6 @@ def broadcast_offer():
     while True:
         if not is_playing:
             udp_server.sendto(offer_message, ('255.255.255.255', client_offer_msg_port ))
-            #print("Sent messsage")
             time.sleep(2)
 
 def handle_request(client_socket):
@@ -80,13 +79,9 @@ def handle_game(client_socket, num_round):
                     player_score = player_score + get_val_by_rank(new_card)
                     round_status = check_status(player_score, dealer_score, did_stand)     
                     client_socket.sendall(make_payload(round_status, new_card))
-                    # if round_status == 0x2:
-                    #     print(f"DEBUG: player score: {player_score}, dealer score: {dealer_score}")
-                    #     continue
-                    #client_socket.sendall(make_payload(0x0, new_card))
+                    
                 elif player_decision == "Stand":
                     did_stand =  True
-                    # round_status = check_status(player_score, dealer_score, did_stand)
             print(f"DEBUG: player score: {player_score}, dealer score: {dealer_score}")
         #if player busted we go into the if:
         if round_status == 0x2:
@@ -98,8 +93,7 @@ def handle_game(client_socket, num_round):
         #--------------player turn ends-----------------------
         round_status = check_status(player_score, dealer_score, did_stand)  #maybe server is already at score>= 17 and the roudnshould end now
         if round_status != 0x0 :
-            # second_d_card_msg = make_payload(0x0, d_card2)                                  # dealer turn start
-            # client_socket.sendall(second_d_card_msg)                                                         # check if player lost during his turn
+          
             client_socket.sendall(make_payload(round_status, p_card1))                  #p_card1 here shouldnt be read by the client because round_status is not 0x0
             print(f"round ended with result {round_status}, moving on to next round")
             continue
@@ -168,8 +162,6 @@ def make_payload(round_result : int, card : tuple[int, int] ):
 #return tuple <rank,suit>
 def drawCard(deck):
     card = deck.draw()
-    # suit = random.randint(0, 3)
-    # rank = random.randint(1, 13)
     return card
 
 
@@ -241,4 +233,3 @@ while True:
         print(f"got an error trying to handle message from client: {e}")
     finally:
         is_playing = False
-    #got a message, check if the message is a request msg

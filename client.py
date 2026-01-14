@@ -48,7 +48,7 @@ def handle_game(tcp_client):
                 tcp_client.sendall(make_payload(user_decision))
                 print("Standing, waiting for dealer")
                 second_d_card = struct.unpack('!IBBHB', tcp_client.recv(9)) #should be getting the second card of the dealer revealed
-                print(second_d_card)
+                #print(second_d_card) #debug print
                 if second_d_card[0] != magic_cookie or second_d_card[1] != payload_msg_type or second_d_card[2] != 0x0:
                     raise Exception("got error when revealing second dealer card")
                 print(f"The dealer's second card is {RANKS.get(second_d_card[3])} of {SUITS.get(second_d_card[4])}")
@@ -134,7 +134,7 @@ team_name = "DaWinnersXDXD"
 offer_msg_port = 13122
 offer_msg_type = 0x2
 udp_client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-# Bind to "0.0.0.0" (all interfaces) and the specific port
+
 ip = get_local_ip()
 udp_client.bind((ip, offer_msg_port))
 udp_client.settimeout(1.0)
