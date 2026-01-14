@@ -3,7 +3,7 @@ import time
 import struct
 import threading
 import random
-
+import Deck
 
 # Suit Mapping (for display purposes)
 SUITS = {0: "Spades", 1: "Hearts", 2: "Diamonds", 3: "Clubs"}
